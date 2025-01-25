@@ -7,48 +7,56 @@
 -->
 <html lang="en">
   <head>
-    <link
-      href="https://fonts.googleapis.com/css?family=Roboto"
-      rel="stylesheet"
-    />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tile layers examples</title>
+
+    <!-- Preload Roboto font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700" rel="stylesheet" />
+
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-      crossorigin=""
+      crossorigin
     />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.3.1/ol.css" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@^5.0.1/dist/maplibre-gl.css" />
+
     <script
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-      crossorigin=""
+      crossorigin
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/ol@v10.3.1/dist/ol.js"></script>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/ol@v10.3.1/ol.css"
-    />
     <script src="https://maps.googleapis.com/maps/api/js"></script>
     <script src="https://unpkg.com/maplibre-gl@^5.0.1/dist/maplibre-gl.js"></script>
-    <link
-      href="https://unpkg.com/maplibre-gl@^5.0.1/dist/maplibre-gl.css"
-      rel="stylesheet"
-    />
+
     <style>
+      /* Base styles */
       html,
       body {
         font-family: "Roboto", sans-serif;
         font-weight: 100;
+        margin: 0;
+        padding: 0;
       }
 
       h2 {
         font-weight: 100;
+        margin-top: 0;
       }
 
+      /* Map containers */
       .map {
         height: 600px;
+        position: relative;
       }
 
-      #ol_geojson_code {
+      /* Grid code displays */
+      .grid-code {
         background: white;
         border-radius: 2px;
         font-size: 24px;
@@ -56,14 +64,23 @@
         position: absolute;
         text-align: center;
         top: 10px;
-        left: 50px;
         min-width: 200px;
+        z-index: 1000;
+      }
+
+      #ol_grid_code {
+        left: 50px;
+      }
+
+      #ml_grid_code {
+        left: 10px;
       }
 
       /* Tab styles */
       .tab-container {
         width: 100%;
-        margin: 20px 0;
+        max-width: 1200px;
+        margin: 0 auto;
       }
 
       .tab-buttons {
@@ -91,36 +108,41 @@
 
       .tab-content {
         display: none;
+        margin-bottom: 40px;
       }
 
       .tab-content.active {
         display: block;
       }
     </style>
-    <title>Tile layers examples</title>
   </head>
 
   <body>
     <script type="text/javascript">
+      // Global configuration
+      const MAP_CONFIG = {
+        center: [8.54, 47.5], // [longitude, latitude]
+        zoom: 4,
+        attribution: {
+          osm: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          grid: 'grid by <a href="https://plus.codes">plus codes</a>',
+        },
+      };
+
       // Define the path to the Plus Code grid server.
       const gridServer = "http://localhost:8080/grid";
 
       // Tab functionality
       function openTab(evt, tabName) {
-        const tabContents = document.getElementsByClassName("tab-content");
-        const tabButtons = document.getElementsByClassName("tab-button");
-
-        // Hide all tab contents
-        for (let content of tabContents) {
+        // Hide all tabs
+        document.querySelectorAll(".tab-content").forEach((content) => {
           content.classList.remove("active");
-        }
-
-        // Deactivate all tab buttons
-        for (let button of tabButtons) {
+        });
+        document.querySelectorAll(".tab-button").forEach((button) => {
           button.classList.remove("active");
-        }
+        });
 
-        // Show the selected tab content and activate the button
+        // Show selected tab
         document.getElementById(tabName).classList.add("active");
         evt.currentTarget.classList.add("active");
       }
@@ -128,83 +150,58 @@
 
     <div class="tab-container">
       <div class="tab-buttons">
-        <button
-          class="tab-button active"
-          onclick="openTab(event, 'ol-geojson-wms')"
-        >
-          OpenLayers GeoJSON
-        </button>
-        <button class="tab-button" onclick="openTab(event, 'ol-image-tms')">
-          OpenLayers Image
-        </button>
-        <button
-          class="tab-button"
-          onclick="openTab(event, 'leaflet-image-tms')"
-        >
-          Leaflet Image
-        </button>
-        <button class="tab-button" onclick="openTab(event, 'google-image-wms')">
-          Google Maps API Image
-        </button>
-        <button class="tab-button" onclick="openTab(event, 'maplibre-mvt-wms')">
-          MapLibre GL MVT
-        </button>
+        <button class="tab-button active" onclick="openTab(event, 'ol-geojson-wms')">OpenLayers GeoJSON</button>
+        <button class="tab-button" onclick="openTab(event, 'ol-image-tms')">OpenLayers Image</button>
+        <button class="tab-button" onclick="openTab(event, 'leaflet-image-tms')">Leaflet Image</button>
+        <button class="tab-button" onclick="openTab(event, 'google-image-wms')">Google Maps API Image</button>
+        <button class="tab-button" onclick="openTab(event, 'maplibre-mvt-wms')">MapLibre MVT</button>
       </div>
 
       <!-- OpenLayers GeoJSON WMS tiles section -->
       <section id="ol-geojson-wms" class="tab-content active">
         <h2>OpenLayers GeoJSON WMS tiles</h2>
-        <p>
-          Uses the option <code>zoomadjust=2</code> to fetch a more detailed
-          grid level than the default.
-        </p>
+        <p>Uses the option <code>zoomadjust=2</code> to fetch a more detailed grid level than the default.</p>
         <div style="position: relative">
           <div id="ol_geojson_wms" class="map"></div>
-          <div id="ol_geojson_code">Click cell, get Plus Code</div>
+          <div id="ol_grid_code" class="grid-code">Click cell, get Plus Code</div>
         </div>
 
         <script type="text/javascript">
           // OpenLayers example, with GeoJSON WMS tiles.
-
-          // Create the vector layer.
-          const olGeojsonLayer = new ol.layer.VectorTile({
-            source: new ol.source.VectorTile({
-              maxZoom: 25,
-              attributions:
-                'grid by <a href="https://plus.codes">plus codes</a>',
-              format: new ol.format.GeoJSON(),
-              // Using WMS tile numbering.
-              url: `${gridServer}/wms/{z}/{x}/{y}.json?zoomadjust=2`,
-            }),
-          });
-
-          // Create the map, with Openstreetmap map tiles and the vector layer.
           const olGeojsonMap = new ol.Map({
             target: "ol_geojson_wms",
             layers: [
               new ol.layer.Tile({
-                source: new ol.source.OSM(),
+                source: new ol.source.OSM({
+                  attributions: MAP_CONFIG.attribution.osm,
+                }),
               }),
-              olGeojsonLayer,
+              new ol.layer.VectorTile({
+                source: new ol.source.VectorTile({
+                  maxZoom: 25,
+                  attributions: MAP_CONFIG.attribution.grid,
+                  format: new ol.format.GeoJSON(),
+                  // Using WMS tile numbering.
+                  url: `${gridServer}/wms/{z}/{x}/{y}.json?zoomadjust=2`,
+                }),
+              }),
             ],
             view: new ol.View({
-              center: ol.proj.fromLonLat([8.54, 47.5]),
-              zoom: 4,
+              center: ol.proj.fromLonLat(MAP_CONFIG.center),
+              zoom: MAP_CONFIG.zoom,
             }),
           });
 
           // Define an action so that clicking on the map will display the global code.
-          const selectPointerMove = new ol.interaction.Select({
+          const selectClick = new ol.interaction.Select({
             condition: ol.events.condition.click,
           });
 
-          selectPointerMove.on("select", (e) => {
-            document.getElementById("ol_geojson_code").innerHTML = e.target
-              .getFeatures()
-              .getArray()[0]
-              .get("global_code");
+          selectClick.on("select", (e) => {
+            const features = e.target.getFeatures().getArray();
+            document.getElementById("ol_grid_code").innerHTML = features[0].get("global_code");
           });
-          olGeojsonMap.addInteraction(selectPointerMove);
+          olGeojsonMap.addInteraction(selectClick);
         </script>
       </section>
 
@@ -213,8 +210,8 @@
         <h2>OpenLayers image TMS tiles</h2>
         <p>
           Uses the options
-          <code>linecol=0xff0000ff&labelcol=0xff000060</code> to set the lines
-          to red and the labels to a non-opaque red.
+          <code>linecol=0xff0000ff&labelcol=0xff000060</code> to set the lines to red and the labels to a non-opaque
+          red.
         </p>
         <div id="ol_image_tms" class="map"></div>
 
@@ -224,20 +221,21 @@
             target: "ol_image_tms",
             layers: [
               new ol.layer.Tile({
-                source: new ol.source.OSM(),
+                source: new ol.source.OSM({
+                  attributions: MAP_CONFIG.attribution.osm,
+                }),
               }),
               new ol.layer.Tile({
                 source: new ol.source.XYZ({
-                  attributions:
-                    'grid by <a href="https://plus.codes">plus codes</a>',
+                  attributions: MAP_CONFIG.attribution.grid,
                   // XYZ layers use WMS tile numbering, use -y for TMS.
                   url: `${gridServer}/tms/{z}/{x}/{-y}.png?linecol=0xff0000ff&labelcol=0xff000060`,
                 }),
               }),
             ],
             view: new ol.View({
-              center: ol.proj.fromLonLat([8.54, 47.5]),
-              zoom: 4,
+              center: ol.proj.fromLonLat(MAP_CONFIG.center),
+              zoom: MAP_CONFIG.zoom,
             }),
           });
         </script>
@@ -246,24 +244,22 @@
       <!-- Leaflet image TMS tiles section -->
       <section id="leaflet-image-tms" class="tab-content">
         <h2>Leaflet image TMS tiles</h2>
-        <p></p>
         <div id="ll_image_tms" class="map"></div>
 
         <script type="text/javascript">
           // Leaflet example, with Openstreetmap map tiles and TMS-numbered image tiles.
           const llImageMap = L.map("ll_image_tms", { maxZoom: 21 }).setView(
-            [47.5, 8.54],
-            4
+            [MAP_CONFIG.center[1], MAP_CONFIG.center[0]], // Leaflet uses [lat, lng] order
+            MAP_CONFIG.zoom
           );
 
           L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution:
-              '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            attribution: MAP_CONFIG.attribution.osm,
           }).addTo(llImageMap);
 
           L.tileLayer(`${gridServer}/tms/{z}/{x}/{y}.png`, {
             tms: true,
-            attribution: 'grid by <a href="https://plus.codes">plus codes</a>',
+            attribution: MAP_CONFIG.attribution.grid,
           }).addTo(llImageMap);
         </script>
       </section>
@@ -275,18 +271,16 @@
 
         <script type="text/javascript">
           // Google Maps API example, with WMS image tiles.
-          const googleImageMap = new google.maps.Map(
-            document.getElementById("g_image_wms"),
-            {
-              zoom: 4,
-              center: { lat: 47.5, lng: 8.54 },
-            }
-          );
+          const googleImageMap = new google.maps.Map(document.getElementById("g_image_wms"), {
+            zoom: MAP_CONFIG.zoom,
+            center: {
+              lat: MAP_CONFIG.center[1],
+              lng: MAP_CONFIG.center[0],
+            },
+          });
 
           const googleImageTiles = new google.maps.ImageMapType({
-            getTileUrl: (coord, zoom) => {
-              return `${gridServer}/wms/${zoom}/${coord.x}/${coord.y}.png`;
-            },
+            getTileUrl: (coord, zoom) => `${gridServer}/wms/${zoom}/${coord.x}/${coord.y}.png`,
             tileSize: new google.maps.Size(256, 256),
           });
 
@@ -297,10 +291,13 @@
       <!-- MapLibre GL JS MVT WMS tiles section -->
       <section id="maplibre-mvt-wms" class="tab-content">
         <h2>MapLibre GL JS MVT WMS tiles</h2>
-        <div id="ml_mvt_wms" class="map"></div>
+        <div style="position: relative">
+          <div id="ml_mvt_wms" class="map"></div>
+          <div id="ml_grid_code" class="grid-code">Click cell, get Plus Code</div>
+        </div>
 
         <script type="text/javascript">
-          // MapLibre GL JS example using MVT with WMS tile numbering
+          // MapLibre GL JS example, with MVT WMS tiles.
           const mlMvtMap = new maplibregl.Map({
             container: "ml_mvt_wms",
             style: {
@@ -310,15 +307,13 @@
                   type: "raster",
                   tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
                   tileSize: 256,
-                  attribution:
-                    '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                  attribution: MAP_CONFIG.attribution.osm,
                 },
                 grid: {
                   type: "vector",
-                  tiles: [`${gridServer}/wms/{z}/{x}/{y}.mvt`],
-                  maxzoom: 22,
-                  attribution:
-                    'grid by <a href="https://plus.codes">plus codes</a>',
+                  tiles: [`${gridServer}/wms/{z}/{x}/{y}.mvt?zoomadjust=2`],
+                  maxzoom: 25,
+                  attribution: MAP_CONFIG.attribution.grid,
                 },
               },
               layers: [
@@ -326,29 +321,34 @@
                   id: "osm",
                   type: "raster",
                   source: "osm",
-                  paint: {},
                 },
                 {
                   id: "grid",
-                  type: "line",
+                  type: "fill",
                   source: "grid",
                   "source-layer": "grid",
                   paint: {
-                    "line-color": "#FF0000",
-                    "line-width": 1,
+                    "fill-color": "rgba(0, 0, 0, 0)",
+                    "fill-outline-color": "#FF0000",
                   },
                 },
               ],
             },
-            center: [8.54, 47.5],
-            zoom: 4,
+            center: MAP_CONFIG.center,
+            zoom: MAP_CONFIG.zoom,
+          });
+
+          // Define an action so that clicking on the map will display the global code.
+          mlMvtMap.on("click", (e) => {
+            const features = mlMvtMap.queryRenderedFeatures(e.point);
+            document.getElementById("ml_grid_code").innerHTML = features[0].properties.global_code;
           });
         </script>
       </section>
     </div>
 
     <script>
-      // Initialize maps after tab change to ensure proper rendering
+      // Registry of all map instances
       const maps = {
         "ol-geojson-wms": olGeojsonMap,
         "ol-image-tms": olImageMap,
@@ -357,30 +357,25 @@
         "maplibre-mvt-wms": mlMvtMap,
       };
 
-      // Update map size when tab is changed
-      function updateMapSize(tabName) {
-        if (maps[tabName]) {
-          setTimeout(() => {
-            // Handle different map types
-            if (maps[tabName].updateSize) {
-              // OpenLayers maps
-              maps[tabName].updateSize();
-            } else if (maps[tabName].invalidateSize) {
-              // Leaflet maps
-              maps[tabName].invalidateSize();
-            } else {
-              // Google Maps and MapLibre GL maps need to trigger resize
-              window.dispatchEvent(new Event("resize"));
-            }
-          }, 100);
+      // Handle map resize
+      function resizeMap(map) {
+        if (map.updateSize) {
+          map.updateSize(); // OpenLayers
+        } else if (map.invalidateSize) {
+          map.invalidateSize(); // Leaflet
+        } else {
+          window.dispatchEvent(new Event("resize")); // Google Maps & MapLibre
         }
       }
 
-      // Add map update to tab change
+      // Extend tab switching to handle map resizing
       const originalOpenTab = openTab;
       openTab = function (evt, tabName) {
         originalOpenTab(evt, tabName);
-        updateMapSize(tabName);
+        const map = maps[tabName];
+        if (map) {
+          setTimeout(() => resizeMap(map), 100);
+        }
       };
     </script>
   </body>
